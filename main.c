@@ -6,6 +6,14 @@
 
 #include IMPL
 
+#ifdef OPT
+#define OUT_FILE "opt.txt"
+#elif HASH
+#define OUT_FILE "opt_hash.txt"
+#else
+#define OUT_FILE "orig.txt"
+#endif
+
 #define DICT_FILE "./dictionary/words.txt"
 
 static double diff_in_second(struct timespec t1, struct timespec t2)
@@ -36,9 +44,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+#ifndef HASH
+
     /* build the entry */
     entry *pHead, *e;
-    pHead = (entry *) malloc(sizeof(entry));
+    pHead = (entry *) malloc(sizeof(entry));//問
     printf("size of entry : %lu bytes\n", sizeof(entry));
     e = pHead;
     e->pNext = NULL;
@@ -54,6 +64,7 @@ int main(int argc, char *argv[])
         i = 0;
         e = append(line, e);
     }
+
     clock_gettime(CLOCK_REALTIME, &end);
     cpu_time1 = diff_in_second(start, end);
 
@@ -79,12 +90,7 @@ int main(int argc, char *argv[])
     clock_gettime(CLOCK_REALTIME, &end);
     cpu_time2 = diff_in_second(start, end);
 
-    FILE *output;
-#if defined(OPT)
-    output = fopen("opt.txt", "a");
-#else
-    output = fopen("orig.txt", "a");
-#endif
+    FILE *output = fopen(OUT_FILE, "a");
     fprintf(output, "append() findName() %lf %lf\n", cpu_time1, cpu_time2);
     fclose(output);
 
@@ -93,6 +99,44 @@ int main(int argc, char *argv[])
 
     if (pHead->pNext) free(pHead->pNext);
     free(pHead);
+#else
+    HashTable *table;
+    table = (HashTable *) malloc(sizeof(HashTable));
 
+    clock_gettime(CLOCK_REALTIME, &start);
+    while (fgets(line, sizeof(line), fp)) {
+        while (line[i] != '\0')
+            i++;
+        line[i - 1] = '\0';
+        i = 0;
+        append(line, table);
+    }
+
+    clock_gettime(CLOCK_REALTIME, &end);
+    cpu_time1 = diff_in_second(start, end);
+
+    fclose(fp);
+    char input[MAX_LAST_NAME_SIZE] = "zyxel";
+    assert(0 == strcmp(findName(input, table)->lastName, "zyxel"));
+    /*#if defined(__GNUC__)
+        __builtin___clear_cache((char *) pHead, (char *) pHead + sizeof(entry));
+#endif*/
+    /* compute the execution time */
+    clock_gettime(CLOCK_REALTIME, &start);
+    findName(input, table);
+    clock_gettime(CLOCK_REALTIME, &end);
+    cpu_time2 = diff_in_second(start, end);
+
+    FILE *output = fopen(OUT_FILE, "a");
+    fprintf(output, "append() findName() %lf %lf\n", cpu_time1, cpu_time2);
+    fclose(output);
+
+    printf("execution time of append() : %lf sec\n", cpu_time1);
+    printf("execution time of findName() : %lf sec\n", cpu_time2);
+
+    HashTableFree(table);
+    free(table);
+
+#endif
     return 0;
 }
